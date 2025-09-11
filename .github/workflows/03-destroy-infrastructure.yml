@@ -98,7 +98,7 @@ jobs:
 
       - name: Upload backup artifact
         if: ${{ github.event.inputs.backup_before_destroy == 'true' }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: infrastructure-backup-${{ github.run_number }}
           path: backup.tar.gz

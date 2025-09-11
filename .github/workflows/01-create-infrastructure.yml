@@ -206,7 +206,7 @@ jobs:
           echo "✅ All instances are ready for configuration"
 
       - name: Upload outputs as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: terraform-outputs
           path: terraform/outputs.json
