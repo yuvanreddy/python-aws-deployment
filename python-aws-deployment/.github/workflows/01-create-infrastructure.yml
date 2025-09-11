@@ -219,4 +219,4 @@ jobs:
           echo "========================================="
           echo "Next step: Run '02 - Install Python' workflow"
           echo "to install and configure Python on the instances"
-          echo "========================================="
+          echo "=========================================="
