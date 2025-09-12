@@ -19,7 +19,6 @@ provider "aws" {
       Environment = var.environment
       ManagedBy   = "Terraform"
       Project     = "PythonDeployment"
-      CreatedAt   = timestamp()
     }
   }
 }
