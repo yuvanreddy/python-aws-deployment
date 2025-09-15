@@ -1,0 +1,21 @@
+plugin: amazon.aws.aws_ec2
+regions:
+  - us-east-1  # Change this to match your AWS_REGION
+filters:
+  instance-state-name: running
+  tag:ManagedBy: Terraform
+  tag:Project: PythonDeployment
+keyed_groups:
+  - key: tags
+    prefix: tag
+  - key: instance_type
+    prefix: instance_type
+  - key: placement.availability_zone
+    prefix: az
+hostnames:
+  - instance-id
+  - dns-name
+  - private-ip-address
+compose:
+  ansible_host: public_ip_address
+  ansible_user: "'ubuntu' if 'ubuntu' in image_id else 'ec2-user'"
