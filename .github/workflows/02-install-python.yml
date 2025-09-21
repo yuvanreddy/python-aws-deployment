@@ -98,14 +98,46 @@ jobs:
           }
           EOF
           
-          terraform init -reconfigure
+          # Retry terraform init to handle transient S3/DynamoDB eventual consistency
+          ATTEMPTS=0
+          until terraform init -reconfigure; do
+            ATTEMPTS=$((ATTEMPTS+1))
+            if [ "$ATTEMPTS" -ge 3 ]; then
+              echo "❌ Terraform init failed after $ATTEMPTS attempts"
+              exit 1
+            fi
+            echo "⚠️ terraform init failed (attempt $ATTEMPTS). Retrying in 20s..."
+            sleep 20
+          done
 
       - name: Get Terraform outputs
         id: get_outputs
         working-directory: terraform
         run: |
-          INSTANCE_IDS=$(terraform output -json instance_ids 2>/dev/null || echo "[]")
-          PUBLIC_IPS=$(terraform output -json public_ips 2>/dev/null || echo "[]")
+          # Retry terraform output to handle transient state availability
+          ATTEMPTS=0
+          until INSTANCE_IDS=$(terraform output -json instance_ids 2>/dev/null); do
+            ATTEMPTS=$((ATTEMPTS+1))
+            if [ "$ATTEMPTS" -ge 3 ]; then
+              echo "❌ Failed to read instance_ids after $ATTEMPTS attempts"
+              INSTANCE_IDS="[]"
+              break
+            fi
+            echo "⚠️ terraform output instance_ids failed (attempt $ATTEMPTS). Retrying in 10s..."
+            sleep 10
+          done
+
+          ATTEMPTS=0
+          until PUBLIC_IPS=$(terraform output -json public_ips 2>/dev/null); do
+            ATTEMPTS=$((ATTEMPTS+1))
+            if [ "$ATTEMPTS" -ge 3 ]; then
+              echo "❌ Failed to read public_ips after $ATTEMPTS attempts"
+              PUBLIC_IPS="[]"
+              break
+            fi
+            echo "⚠️ terraform output public_ips failed (attempt $ATTEMPTS). Retrying in 10s..."
+            sleep 10
+          done
           
           echo "instance_ids=$INSTANCE_IDS" >> $GITHUB_OUTPUT
           echo "public_ips=$PUBLIC_IPS" >> $GITHUB_OUTPUT

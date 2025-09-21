@@ -136,7 +136,17 @@ jobs:
           }
           EOF
           
-          terraform init -reconfigure
+          # Retry terraform init to handle transient S3/DynamoDB eventual consistency
+          ATTEMPTS=0
+          until terraform init -reconfigure; do
+            ATTEMPTS=$((ATTEMPTS+1))
+            if [ "$ATTEMPTS" -ge 3 ]; then
+              echo "❌ Terraform init failed after $ATTEMPTS attempts"
+              exit 1
+            fi
+            echo "⚠️ terraform init failed (attempt $ATTEMPTS). Retrying in 20s..."
+            sleep 20
+          done
           echo "✅ Terraform initialized"
 
       - name: Validate Terraform configuration
