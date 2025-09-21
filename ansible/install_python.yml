@@ -1,0 +1,154 @@
+---
+- name: Install and Configure Python
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  vars:
+    # These can be overridden via --extra-vars
+    python_version_default: "3.11"
+    pip_packages_default: "boto3,requests,pandas,numpy"
+
+  tasks:
+    - name: Set effective variables from defaults or extra-vars
+      set_fact:
+        effective_python_version: "{{ python_version | default(python_version_default) }}"
+        effective_pip_packages: "{{ pip_packages | default(pip_packages_default) }}"
+
+    - name: Update package cache (Ubuntu/Debian)
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+    
+    - name: Update package cache (RHEL/CentOS/Amazon Linux)
+      yum:
+        update_cache: yes
+      when: ansible_os_family == "RedHat"
+    
+    - name: Install Python build dependencies (Ubuntu/Debian)
+      apt:
+        name:
+          - build-essential
+          - libssl-dev
+          - zlib1g-dev
+          - libbz2-dev
+          - libreadline-dev
+          - libsqlite3-dev
+          - wget
+          - curl
+          - llvm
+          - libncurses5-dev
+          - libncursesw5-dev
+          - xz-utils
+          - tk-dev
+          - libffi-dev
+          - liblzma-dev
+          - python3-openssl
+          - git
+        state: present
+      when: ansible_os_family == "Debian"
+    
+    - name: Install Python build dependencies (RHEL/CentOS/Amazon Linux)
+      yum:
+        name:
+          - gcc
+          - openssl-devel
+          - bzip2-devel
+          - libffi-devel
+          - zlib-devel
+          - wget
+          - make
+        state: present
+      when: ansible_os_family == "RedHat"
+    
+    - name: Install Python {{ effective_python_version }}
+      block:
+        - name: Add deadsnakes PPA (Ubuntu)
+          apt_repository:
+            repo: ppa:deadsnakes/ppa
+            state: present
+          when: ansible_distribution == "Ubuntu"
+        
+        - name: Install Python {{ effective_python_version }} (Ubuntu)
+          apt:
+            name:
+              - "python{{ effective_python_version }}"
+              - "python{{ effective_python_version }}-venv"
+              - "python{{ effective_python_version }}-dev"
+              - python3-pip
+            state: present
+          when: ansible_os_family == "Debian"
+        
+        - name: Install Python {{ effective_python_version }} (RHEL/CentOS/Amazon Linux)
+          yum:
+            name:
+              - python3
+              - python3-pip
+              - python3-devel
+            state: present
+          when: ansible_os_family == "RedHat"
+    
+    - name: Upgrade pip
+      pip:
+        name: pip
+        state: latest
+        executable: pip3
+    
+    - name: Install pip packages
+      pip:
+        name: "{{ item }}"
+        state: present
+        executable: pip3
+      loop: "{{ effective_pip_packages.split(',') }}"
+      when: effective_pip_packages != ""
+    
+    - name: Create Python test script
+      copy:
+        content: |
+          #!/usr/bin/env python3
+          import sys
+          import platform
+          import json
+          
+          info = {
+              "python_version": platform.python_version(),
+              "platform": platform.platform(),
+              "processor": platform.processor(),
+              "hostname": platform.node(),
+              "python_path": sys.executable
+          }
+          
+          print(json.dumps(info, indent=2))
+          
+          # Test installed packages
+          packages = "{{ effective_pip_packages }}".split(',')
+          installed = []
+          missing = []
+          
+          for package in packages:
+            package = package.strip()
+            if package:
+              try:
+                __import__(package.replace('-', '_'))
+                installed.append(package)
+              except ImportError:
+                missing.append(package)
+          
+          print(f"\nInstalled packages: {installed}")
+          if missing:
+            print(f"Missing packages: {missing}")
+            sys.exit(1)
+          else:
+            print("All required packages are installed successfully!")
+        dest: /tmp/test_python.py
+        mode: '0755'
+    
+    - name: Run Python test script
+      command: python3 /tmp/test_python.py
+      register: python_test
+      changed_when: false
+    
+    - name: Display Python test results
+      debug:
+        msg: "{{ python_test.stdout }}"
